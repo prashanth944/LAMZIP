@@ -1,0 +1,310 @@
+// these methods are from service.ts calling from another component.ts file 
+
+GetStatusDDL(): Observable<LaborMasterRecords[]> { // LabotMasterRecords[] type of array
+        return new Observable<LaborMasterRecords[]>((observer) => {
+            this.http
+                .get<LaborMasterRecords[]>(
+                    `${environment.apiUrl}${routes.getStatusDDL}` //environment is a file that stored the all environments like dev, qa, stg
+                )                                                 // .apiUrl is for url of the api routes.getStatusDDL is method from api
+                .subscribe(
+                    (res) => {
+                        observer.next(res);
+                    },
+                    (error) => {
+                        this.handleError(error);
+                    }
+                );
+        });
+    } 
+
+
+AddAssemblyTechnician(request: LaborAssemblyTechnicianViewModel): Observable<number> { // Post method is for type of request: LaborAssemblyTechnicianViewModel
+        return new Observable<number>((observer) => {                                  // method with arguments
+            this.http
+                .post<number>(
+                    `${environment.apiUrl}${routes.addAssemblyTechnician}`,
+                    request
+                )
+                .subscribe(
+                    (res) => {
+                        observer.next(res);
+                    },
+                    (error) => {
+                        this.handleError(error);
+                    }
+                );
+        });
+    }
+
+/// Put calling
+
+
+    UpdateProductManagmentMap(
+        request: LabourManagementGroupMappingRequest[]
+    ): Observable<number> {
+        return new Observable<number>((observer) => {
+            this.http
+                .put<number>(
+                    `${environment.apiUrl}${routes.updateProductManagmentMap}`,
+                    request
+                )
+                .subscribe(
+                    (res) => {
+                        observer.next(res);
+                    },
+                    (error) => {
+                        this.handleError(error);
+                    }
+                );
+        });
+    }
+//put API
+
+   [HttpPut]
+        [Route("UpdateProductManagmentMap")]
+        public IActionResult UpdateProductManagmentMap([FromBody] LabourManagementGroupMapping[] laborManagementProductMap)
+        {
+            if (laborManagementProductMap == null)
+                NotFound();
+            LaborCapacityPlanning laborCapacityPlanning = new LaborCapacityPlanning();
+            var data = laborCapacityPlanning.UpdateProductManagmentMap(GetConnectionString(), laborManagementProductMap);
+            if (data >= 1)
+                return Ok(new { Value = "Updated Successfully" });
+            else
+                return Ok(new { Value = "Record not found! Please Try Again" });
+        }
+//
+        public int UpdateProductManagmentMap(string connString, LabourManagementGroupMapping[] AD)
+        {
+            var resultCount = 0;
+            var Count = 0;
+            var outParam = new SqlParameter("@rowCount", SqlDbType.Int)
+            {
+                Direction = ParameterDirection.Output
+            };
+            try
+            {
+                foreach (var items in AD)
+                {
+                    SqlParameter[] param1 = {
+               new SqlParameter("@laborManagmentGroupID", items.LaborManagmentGroupID),
+               outParam
+            };
+                    Count = SqlHelper.ExecuteNonQuery(connString, "uspdeleteProductManagmentMap", param1);
+
+                    foreach (var item in items.LaborMgmtGrpDetails)
+                    {
+                        SqlParameter[] param = {
+                                            new SqlParameter("@laborManagmentGroupID", items.LaborManagmentGroupID),
+                                            new SqlParameter("@productGroupID", item.ProductGroupID),
+                                         
+                   outParam
+
+            };
+
+                        resultCount = SqlHelper.ExecuteNonQuery(connString, "uspEditProductManagmentMap", param);
+                    }
+                }
+                return resultCount;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.ToString());
+            }
+
+        }
+// http Get API method
+
+[HttpGet]
+        [Route("GetProductTypeDDL/{plantid}")]
+        public IActionResult GetProductTypeDDL(int plantid)
+        {
+            LaborCapacityPlanning laborCapacityPlanning = new LaborCapacityPlanning();
+            var data = laborCapacityPlanning.GetProductTypeDDL(GetConnectionString(), plantid);
+            if (data != null)
+                return Ok(data);
+            else
+                return NotFound(new { Value = "Record not found! Please Try Again" });
+        }
+
+// API .cs file
+
+        public List<LaborManagementProductGroupViewModel> GetProductTypeDDL(string connString, int plantid)
+        {
+            try
+            {
+                dataTable = new DataTable();
+                SqlParameter[] param = {
+                new SqlParameter("@PlantID", plantid),
+                };
+
+                dataTable = SqlHelper.GetDataTable(connString, "uspGetProductTypeDDL", param);
+                List<LaborManagementProductGroupViewModel> laborProductGroups = dataTable.AsEnumerable().Select(dtRow => new LaborManagementProductGroupViewModel()
+                {
+                    ProductGroupID = Convert.ToInt64(dtRow["ProductGroupID"]),
+                    ProductName = Convert.ToString(dtRow["ProductName"])
+                }).ToList();
+                return laborProductGroups;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.ToString());
+            }
+        }
+// from the component.ts file for get method
+
+ this.laborService
+          .GetProductTypeDDL(this.site?.plantId)
+          .subscribe((res) => {
+            if (res && res.length > 0) {
+              res.forEach((val) => {
+                const newStatus: Item = {
+                  value: val.productGroupID,
+                  text: val.productName,
+                };
+                this.productTypeGroup.push(newStatus);
+                this.tempProductTypeGroup = [
+                  ...this.productTypeGroup,
+                ];
+                this.masterProductTypeGroup = [
+                  ...this.productTypeGroup,
+                ];
+              });
+
+// Put from the component.ts file
+
+ this.laborService
+      .UpdateProductManagmentMap(request)
+      .subscribe((res) => {
+        if (res) {
+          this.getProductTypeMapping();
+          this.showSuccess("Saved");
+        }
+      });
+
+
+// post from component.file
+
+onDeleteLaborPool(data: LaborSummaryLaborPool) {
+    this.tempDeleteLaborPool = data;
+    this.isDeleteLaborPool = true;
+  }
+
+
+
+
+
+
+
+// environment file 
+
+import { IEnvironment } from './environment.constants';
+
+
+export const Url = {
+  dev: 'https://dev-pmpm.lamresearch.com/api',
+  qa: 'https://qa-pmpm.lamresearch.com/api',
+  local: 'https://localhost:44333/api',
+  stg: 'https://stg-pmpm.lamresearch.com/api'
+}
+
+export const environment: IEnvironment = {
+  production: false,
+  envName: 'dev_local',
+  apiUrl: Url.dev,
+  angularUrl: '/#',
+};
+
+
+
+
+// IEnvironment file for constants
+
+export interface IEnvironment {
+  production: boolean;
+  envName: string;
+  apiUrl: string;
+  angularUrl: string;
+}
+
+// this if for routes file
+
+  export const routes = {
+      getBuildType: "/LaborCapacity/GetBuildType/",
+      getLaborManagementProductGroup:
+          "/LaborCapacity/GetLaborManagementProductGroup/",
+      addManagementGroup: "/LaborCapacity/AddManagementGroup",
+      getManagementGroup: "/LaborCapacity/GetManagementGroup/",
+      getHeadCount: "/LaborCapacity/GetHeadCount/",
+      getLaborhours: "/LaborCapacity/GetLaborhours/",
+
+      getLaborPool: "/LaborCapacity/GetLaborPool",
+
+      getHeadCountSnapShot: "/LaborCapacity/GetHeadCountSnapShot/",
+      getAssemblyTestDDL: "/LaborCapacity/GetAssemblyTestDDL",
+      getCompressionDDL: "/LaborCapacity/GetCompressionDDL",
+      getDepartmentFromToDDL: "/LaborCapacity/GetDepartmentFromToDDL",
+      getManagementGroupDDL: "/LaborCapacity/GetManagementGroupDDL/",
+      getShiftTypeDDL: "/LaborCapacity/GetShiftTypeDDL/",
+      getStatusDDL: "/LaborCapacity/GetStatusDDL",
+      addAssemblyTechnician: "/LaborCapacity/AddAssemblyTechnician",
+      addShift: "/LaborCapacity/AddShift",
+      updateManagementGroup: "/LaborCapacity/UpdateManagementGroup",
+      updateBuildType: "/LaborCapacity/UpdateBuildType",
+      updateProductManagmentMap: "/LaborCapacity/UpdateProductManagmentMap",
+      getLaborOverTime: "/LaborCapacity/GetLaborOverTime/",
+      getLaborLoanedOut: "/LaborCapacity/GetLaborLoanedOut/",
+      getShiftType: "/LaborCapacity/GetShiftType/",
+      updateShift: "/LaborCapacity/UpdateShift",
+      updateAssemblyTechnician: "/LaborCapacity/UpdateAssemblyTechnician",
+      getProductTypeDDL: "/LaborCapacity/GetProductTypeDDL/",
+      deleteLaborPool: "/LaborCapacity/DeleteLaborPool",
+  };
+//  this for from the API
+
+ [HttpPost]
+        [Route("AddAssemblyTechnician")]
+        public IActionResult AddAssemblyTechnician(LaborAssemblyTechnicianViewModel laborAssemblyTechnicianViewModel)
+        {
+            if (laborAssemblyTechnicianViewModel == null)
+                NotFound();
+            LaborCapacityPlanning laborCapacityPlanning = new LaborCapacityPlanning();
+            var data = laborCapacityPlanning.AddAssemblyTechnician(GetConnectionString(), laborAssemblyTechnicianViewModel);
+            if (data >= 1)
+                return Ok(new { Value = "Added Successfully" });
+            else
+                return NotFound(new { Value = "Record not found! Please Try Again" });
+        }
+
+// from another file
+
+        public int AddAssemblyTechnician(string connString, LaborAssemblyTechnicianViewModel laborAssemblyTechnicianViewModel)
+        {
+            try
+            {
+                var outParam = new SqlParameter("@rowCount", SqlDbType.Int)
+
+                {
+                    Direction = ParameterDirection.Output
+                };
+                SqlParameter[] param = {
+
+                new SqlParameter("@AssembleyTest",laborAssemblyTechnicianViewModel.AssembleyTest),
+                new SqlParameter("@Status",laborAssemblyTechnicianViewModel.Status),
+                new SqlParameter("@ManagementGroup",laborAssemblyTechnicianViewModel.ManagementGroup),
+                new SqlParameter("@shiftID",laborAssemblyTechnicianViewModel.ShiftID),
+                 new SqlParameter("@EffectiveDateString",laborAssemblyTechnicianViewModel.EffectiveDateString),
+                 new SqlParameter("@EndDateString",laborAssemblyTechnicianViewModel.EndDateString),
+                new SqlParameter("@LoanDeptFromTo",laborAssemblyTechnicianViewModel.LoanDeptFromTo),
+                 new SqlParameter("@plantID",laborAssemblyTechnicianViewModel.PlantID),
+                new SqlParameter("@HeadCount",laborAssemblyTechnicianViewModel.HeadCount),
+                outParam
+          };
+
+                return SqlHelper.ExecuteNonQueryNoOutParam(connString, "USPAddAssemblyTechnician", param);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.ToString());
+            }
+        }
